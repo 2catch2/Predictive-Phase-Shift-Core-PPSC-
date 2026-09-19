@@ -1,0 +1,165 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PPSC V1.01 Evolution Engine Dashboard</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { background-color: #0d0f12; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 24px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 16px; margin-bottom: 24px; }
+        .title h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.05em; color: #38bdf8; }
+        .title p { margin: 4px 0 0 0; color: #64748b; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .card { background-color: #141820; border: 1px solid #1e293b; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
+        .card-label { font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; font-weight: 600; }
+        .card-value { font-size: 28px; font-weight: 700; margin-top: 8px; font-family: monospace; }
+        .state-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 14px; font-weight: bold; background: #0369a1; color: #e0f2fe; }
+        .chart-container { background-color: #141820; border: 1px solid #1e293b; padding: 20px; border-radius: 8px; margin-bottom: 24px; height: 360px; }
+        .log-container { background-color: #141820; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 13px; }
+        .log-row { padding: 8px 12px; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; }
+        .log-row:last-child { border-bottom: none; }
+        .token-if { color: #f43f5e; font-weight: bold; }
+        .token-re { color: #fbbf24; font-weight: bold; }
+        .token-be { color: #10b981; font-weight: bold; }
+        .btn { background-color: #38bdf8; color: #0d0f12; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block; }
+        .btn:hover { background-color: #22d3ee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">
+                <h1>Predictive Phase-Shift Core (PPSC)</h1>
+                <p>Morphic State Engine V1.01 Performance Framework</p>
+            </div>
+            <div>
+                <span id="engine-state-badge" class="state-badge">BE</span>
+                <a href="/api/export_csv" class="btn" style="margin-left: 10px;">Download CSV</a>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card"><div class="card-label">Net Profit (P&L)</div><div id="val-pnl" class="card-value" style="color:#10b981;">$0.00</div></div>
+            <div class="card"><div class="card-label">Total Capital</div><div id="val-capital" class="card-value">$100,000.00</div></div>
+            <div class="card"><div class="card-label">Mutations</div><div id="val-mutations" class="card-value">0</div></div>
+            <div class="card"><div class="card-label">Current State</div><div id="val-state" class="card-value"><span id="engine-state-text">BE</span></div></div>
+        </div> <!-- Close grid -->
+
+        <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+
+        <div class="log-container" id="log-feed">
+            <!-- Log entries will be inserted here by JavaScript -->
+        </div>
+    </div> <!-- Close container -->
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script>
+        const pnlElement = document.getElementById('val-pnl');
+        const capitalElement = document.getElementById('val-capital');
+        const mutationsElement = document.getElementById('val-mutations');
+        const stateBadge = document.getElementById('engine-state-badge');
+        const stateText = document.getElementById('engine-state-text');
+        const logFeed = document.getElementById('log-feed');
+        const priceChartCanvas = document.getElementById('priceChart').getContext('2d');
+
+        const chart = new Chart(priceChartCanvas, {
+            type: 'line',
+            data: {
+                labels: [], // Timestamps
+                datasets: [{
+                    label: 'Price',
+                    data: [], // Price values
+                    borderColor: '#38bdf8',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'category',
+                        labels: [],
+                        ticks: {
+                            color: '#94a3b8'
+                        },
+                        grid: {
+                            color: '#1e293b'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#94a3b8'
+                        },
+                        grid: {
+                            color: '#1e293b'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        function updateDashboard() {
+            // Note: This fetch will not work when run offline as it relies on the Colab server.
+            // For offline use, the data would need to be embedded or loaded from a local source.
+            fetch('/api/stream')
+                .then(response => response.json())
+                .then(data => {
+                    // Update metrics
+                    pnlElement.textContent = '$' + data.metrics.net_pnl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    capitalElement.textContent = '$' + data.metrics.capital.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    mutationsElement.textContent = data.metrics.mutations;
+                    stateBadge.textContent = data.metrics.state;
+                    stateText.textContent = data.metrics.state;
+
+                    // Update chart
+                    chart.data.labels = data.history.map(item => item.timestamp);
+                    chart.data.datasets[0].data = data.history.map(item => item.price);
+                    chart.update();
+
+                    // Update logs
+                    logFeed.innerHTML = ''; // Clear previous logs
+                    data.history.forEach(log => {
+                        const logRow = document.createElement('div');
+                        logRow.className = 'log-row';
+                        const tokenClass = `token-${log.token.toLowerCase()}`;
+                        logRow.innerHTML = `
+                            <span>${log.timestamp}</span>
+                            <span>State: ${log.pre_state} -> ${log.current_state || data.metrics.state}</span>
+                            <span>Token: <span class="${tokenClass}">${log.token}</span></span>
+                            <span>Price: $${log.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            <span>Action: ${log.action}</span>
+                            <span>Capital: $${log.capital_balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            ${log.profit_delta !== 0 ? `<span style="color:#10b981;">P&L: +$${log.profit_delta.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>` : ''}
+                        `;
+                        logFeed.prepend(logRow); // Add to top
+                    });
+
+                    if (logFeed.children.length > 50) { // Keep log feed from getting too long
+                        logFeed.removeChild(logFeed.lastChild);
+                    }
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        }
+
+        // Update every 1 second
+        // This will not update when run offline as it relies on the Colab server for data.
+        setInterval(updateDashboard, 1000);
+
+        // Initial load
+        updateDashboard();
+    </script>
+</body>
+</html>

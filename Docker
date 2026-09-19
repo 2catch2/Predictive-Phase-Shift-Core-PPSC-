@@ -1,0 +1,17 @@
+# Use a lightweight, secure base image
+FROM python:3.11-slim
+
+# Set container working directories
+WORKDIR /app
+
+# Copy the core state engine pipeline into the container
+COPY app.py /app/app.py
+
+# Expose the high-speed B2B REST port
+EXPOSE 8080
+
+# Configure production environment flags
+ENV PYTHONUNBUFFERED=1
+
+# Execute the engine microservice on container initialization
+CMD ["python", "app.py"]
